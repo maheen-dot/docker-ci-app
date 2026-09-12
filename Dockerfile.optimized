@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.4
+FROM node:20-alpine AS base
+
+# Build args
+ARG APP_VERSION=dev
+ARG GIT_COMMIT=unknown
+
+# Install dependencies in separate layer
+FROM base AS dependencies
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Final stage
+FROM base AS runtime
+WORKDIR /app
+
+# Environment from build args
+ENV APP_VERSION=${APP_VERSION} \
+    GIT_COMMIT=${GIT_COMMIT} \
+    NODE_ENV=production
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY package*.json ./
+
+# Application code last (changes most frequently)
+COPY app.js .
+
+EXPOSE 3000
+USER node
+CMD ["node", "app.js"]
